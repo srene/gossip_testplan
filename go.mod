@@ -5,8 +5,8 @@ go 1.20
 require (
 	github.com/avast/retry-go v2.6.0+incompatible
 	github.com/libp2p/go-libp2p v0.32.1
+	github.com/libp2p/go-libp2p-pubsub v0.10.0
 	github.com/multiformats/go-multiaddr v0.12.0
-	github.com/multiformats/go-multiaddr-net v0.2.0
 	github.com/testground/sdk-go v0.3.0
 	golang.org/x/sync v0.5.0
 )
@@ -33,6 +33,7 @@ require (
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.0 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.5 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/influxdata/influxdb1-client v0.0.0-20200515024757-02f0bf5dbca3 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect

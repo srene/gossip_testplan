@@ -13,8 +13,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/testground/sdk-go/network"
+	"github.com/testground/sdk-go/ptypes"
 	"github.com/testground/sdk-go/run"
 	"github.com/testground/sdk-go/runtime"
 	tgsync "github.com/testground/sdk-go/sync"
@@ -181,21 +183,51 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 		runenv.RecordMessage("Failing register and wait")
 		return fmt.Errorf("error waiting for discovery service: %s", err)
 	}
-	//if seq == 1 {
-	for i, peer := range discovery.allPeers {
-		runenv.RecordMessage("Connecting to %d %s ", i, peer.Info)
-		//discovery.connectWithRetry(ctx, peer.Info)
-		err := h.Connect(ctx, peer.Info)
-		if err != nil {
-			panic(err)
-		} else {
-			runenv.RecordMessage("Connection succesful")
-		}
+	errgrp, ctx := errgroup.WithContext(ctx)
 
+	//tracer, err := NewTestTracer(tracerOut, h.ID(), t.params.fullTraces)
+
+	rate := ptypes.Rate{Quantity: 5, Interval: time.Second}
+	topic := TopicConfig{Id: "block_channel", MessageRate: rate, MessageSize: 100000}
+	var topics = make([]TopicConfig, 0)
+	topics = append(topics, topic)
+
+	var pub bool
+	if seq == 1 {
+		pub = true
+	} else {
+		pub = false
+	}
+	cfg := NodeConfig{
+		Publisher:       pub,
+		FloodPublishing: false,
+		//PeerScoreParams:         t.params.scoreParams,
+		//OverlayParams:           t.params.overlayParams,
+		//PeerScoreInspect:        scoreInspectParams,
+		Topics: topics,
+		//	Tracer: tracer,
+		Seq:      seq,
+		Warmup:   time.Second * 3,
+		Cooldown: time.Second * 3,
+		//Heartbeat:               t.params.heartbeat,
+		//ValidateQueueSize:       t.params.validateQueueSize,
+		//OutboundQueueSize:       t.params.outboundQueueSize,
+		//OpportunisticGraftTicks: t.params.opportunisticGraftTicks,
 	}
 
-	//}
-	time.Sleep(10 * time.Second)
+	p, err := createNode(ctx, runenv, seq, h, discovery, cfg)
+	if err != nil {
+		runenv.RecordMessage("Failing create pubsub npde")
+		return fmt.Errorf("error waiting for discovery service: %s", err)
+	}
+
+	errgrp.Go(func() (err error) {
+		p.Run(time.Minute * 1)
+		return
+	})
+	errgrp.Wait()
+	runenv.RecordMessage("finishing test")
+	//time.Sleep(10 * time.Second)
 
 	return nil
 }
