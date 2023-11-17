@@ -90,7 +90,7 @@ type PubsubNode struct {
 	pubwg sync.WaitGroup
 }
 
-func createNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h host.Host, discovery *SyncDiscovery, cfg NodeConfig) (*PubsubNode, error) {
+func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h host.Host, discovery *SyncDiscovery, cfg NodeConfig) (*PubsubNode, error) {
 
 	ps, err := pubsub.NewGossipSub(ctx, h)
 
@@ -163,7 +163,7 @@ func (p *PubsubNode) Run(runtime time.Duration) error {
 		go p.joinTopic(t, runtime)
 	}
 
-	/* wait for warmup time to expire
+	//wait for warmup time to expire
 	p.runenv.RecordMessage("Wait for %s warmup time", p.cfg.Warmup)
 	select {
 	case <-time.After(p.cfg.Warmup):
@@ -175,7 +175,7 @@ func (p *PubsubNode) Run(runtime time.Duration) error {
 	npeers := len(p.h.Network().Peers())
 	if npeers < pubsub.GossipSubD {
 		panic(fmt.Errorf("not enough peers after warmup period. Need at least D=%d, have %d", pubsub.GossipSubD, npeers))
-	}*/
+	}
 
 	p.runenv.RecordMessage("Starting gossipsub. Connected to %d peers.", len(p.h.Network().Peers()))
 	// block until complete
@@ -187,7 +187,7 @@ func (p *PubsubNode) Run(runtime time.Duration) error {
 	}
 
 	// if we're publishing, wait until we've sent all our messages or the context expires
-	/*if p.cfg.Publisher {
+	if p.cfg.Publisher {
 		donech := make(chan struct{}, 1)
 		go func() {
 			p.pubwg.Wait()
@@ -208,7 +208,7 @@ func (p *PubsubNode) Run(runtime time.Duration) error {
 		return p.ctx.Err()
 	}
 
-	p.runenv.RecordMessage("Cool down complete")*/
+	p.runenv.RecordMessage("Cool down complete")
 
 	return nil
 }
@@ -220,12 +220,12 @@ func (p *PubsubNode) joinTopic(t TopicConfig, runtime time.Duration) {
 	publishInterval := time.Duration(float64(t.MessageRate.Interval) / t.MessageRate.Quantity)
 	totalMessages := int64(runtime / publishInterval)
 
-	/*if p.cfg.Publisher {
+	if p.cfg.Publisher {
 		p.log("publishing to topic %s. message_rate: %.2f/%ds, publishInterval %dms, msg size %d bytes. total expected messages: %d",
 			t.Id, t.MessageRate.Quantity, t.MessageRate.Interval/time.Second, publishInterval/time.Millisecond, t.MessageSize, totalMessages)
 	} else {
 		p.log("joining topic %s as a lurker", t.Id)
-	}*/
+	}
 
 	if _, ok := p.topics[t.Id]; ok {
 		// already joined, ignore
@@ -346,6 +346,6 @@ func (p *PubsubNode) publishLoop(ts *topicState) {
 func (p *PubsubNode) log(msg string, args ...interface{}) {
 	id := p.h.ID().String()
 	idSuffix := id[len(id)-8:]
-	prefix := fmt.Sprintf("[honest %d %s] ", p.seq, idSuffix)
+	prefix := fmt.Sprintf("[node %d %s] ", p.seq, idSuffix)
 	p.runenv.RecordMessage(prefix+msg, args...)
 }

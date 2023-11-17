@@ -184,11 +184,10 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 		runenv.RecordMessage("Failing register and wait")
 		return fmt.Errorf("error waiting for discovery service: %s", err)
 	}
-	errgrp, ctx := errgroup.WithContext(ctx)
 
 	//tracer, err := NewTestTracer(tracerOut, h.ID(), t.params.fullTraces)
 
-	rate := ptypes.Rate{Quantity: 5, Interval: time.Second}
+	rate := ptypes.Rate{Quantity: 5, Interval: time.Minute}
 	topic := TopicConfig{Id: "block_channel", MessageRate: rate, MessageSize: 100000}
 	var topics = make([]TopicConfig, 0)
 	topics = append(topics, topic)
@@ -209,26 +208,28 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 		//	Tracer: tracer,
 		Seq:      seq,
 		Warmup:   time.Second * 3,
-		Cooldown: time.Second * 3,
+		Cooldown: time.Second * 10,
 		//Heartbeat:               t.params.heartbeat,
 		//ValidateQueueSize:       t.params.validateQueueSize,
 		//OutboundQueueSize:       t.params.outboundQueueSize,
 		//OpportunisticGraftTicks: t.params.opportunisticGraftTicks,
 	}
 
-	p, err := createNode(ctx, runenv, seq, h, discovery, cfg)
+	p, err := createPubSubNode(ctx, runenv, seq, h, discovery, cfg)
 	if err != nil {
 		runenv.RecordMessage("Failing create pubsub npde")
 		return fmt.Errorf("error waiting for discovery service: %s", err)
 	}
 
+	errgrp, ctx := errgroup.WithContext(ctx)
+
 	errgrp.Go(func() (err error) {
 		p.Run(time.Minute * 1)
 		return
 	})
-	errgrp.Wait()
-	runenv.RecordMessage("finishing test")
+	return errgrp.Wait()
+	//runenv.RecordMessage("finishing test")
 	//time.Sleep(10 * time.Second)
 
-	return nil
+	//return nil
 }
