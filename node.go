@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -157,6 +159,7 @@ func (p *PubsubNode) Run(runtime time.Duration) error {
 	// join initial topics
 	p.runenv.RecordMessage("Joining initial topics %d.", len(p.cfg.Topics))
 	for _, t := range p.cfg.Topics {
+		p.runenv.RecordMessage("Joining topic %s %d.", t.Id, t.MessageSize)
 		go p.joinTopic(t, runtime)
 	}
 
@@ -264,18 +267,19 @@ func (p *PubsubNode) joinTopic(t TopicConfig, runtime time.Duration) {
 
 		p.runenv.RecordMessage("Starting publisher with %s publish interval", publishInterval)
 		ts.pubTicker = time.NewTicker(publishInterval)
-		//p.publishLoop(&ts)
+		p.publishLoop(&ts)
 	}()
 }
 
 func (p *PubsubNode) consumeTopic(ts *topicState) {
 	for {
-		_, err := ts.sub.Next(p.ctx)
+		msg, err := ts.sub.Next(p.ctx)
 		if err != nil && err != context.Canceled {
 			p.log("error reading from %s: %s", ts.cfg.Id, err)
 			return
 		}
-		//p.log("got message on topic %s from %s\n", ts.cfg.Id, msg.ReceivedFrom.Pretty())
+		//p.log("got message")
+		p.log("got message on topic %s from %s\n", ts.cfg.Id, msg.ReceivedFrom)
 
 		select {
 		case <-ts.done:
@@ -284,6 +288,57 @@ func (p *PubsubNode) consumeTopic(ts *topicState) {
 			return
 		default:
 			continue
+		}
+	}
+}
+
+func (p *PubsubNode) makeMessage(seq int64, size uint64) ([]byte, error) {
+	type msg struct {
+		sender string
+		seq    int64
+		data   []byte
+	}
+	data := make([]byte, size)
+	rand.Read(data)
+	m := msg{sender: p.h.ID().String(), seq: seq, data: data}
+	return json.Marshal(m)
+}
+
+func (p *PubsubNode) sendMsg(seq int64, ts *topicState) {
+	p.runenv.RecordMessage("Publishing message %d bytes", uint64(ts.cfg.MessageSize))
+
+	msg, err := p.makeMessage(seq, uint64(ts.cfg.MessageSize))
+	if err != nil {
+		p.log("error making message for topic %s: %s", ts.cfg.Id, err)
+		return
+	}
+	var data []byte
+	err = json.Unmarshal(data, msg)
+	//p.runenv.RecordMessage("Publishing message %d bytes", len(data))
+	err = ts.topic.Publish(p.ctx, msg)
+	if err != nil && err != context.Canceled {
+		p.log("error publishing to %s: %s", ts.cfg.Id, err)
+		return
+	}
+}
+
+func (p *PubsubNode) publishLoop(ts *topicState) {
+	var counter int64
+	p.pubwg.Add(1)
+	defer p.pubwg.Done()
+	for {
+		select {
+		case <-ts.done:
+			return
+		case <-p.ctx.Done():
+			return
+		case <-ts.pubTicker.C:
+			go p.sendMsg(counter, ts)
+			counter++
+			if counter > ts.nMessages {
+				ts.pubTicker.Stop()
+				return
+			}
 		}
 	}
 }

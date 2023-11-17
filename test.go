@@ -144,6 +144,7 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 	// Get sequence number within a node type (eg honest-1, honest-2, etc)
 	// signal entry in the 'enrolled' state, and obtain a sequence number.
 	seq, err := client.Publish(ctx, peers, host.InfoFromHost(h))
+
 	if err != nil {
 		return fmt.Errorf("failed to write peer subtree in sync service: %w", err)
 	}
