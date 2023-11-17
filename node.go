@@ -111,6 +111,8 @@ func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h 
 		discovery: discovery,
 		topics:    make(map[string]*topicState),
 	}
+
+	p.connectTopology(ctx)
 	/*err = p.Run(t.params.runtime, func(ctx context.Context) error {
 		// wait for all other nodes to be ready
 		if err := t.waitForReadyState(ctx); err != nil {
@@ -121,8 +123,9 @@ func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h 
 		go t.connectTopology(ctx)
 
 		return nil
-	})*/
+	})
 	//if seq == 1 {
+	connectionCount := 0
 	for i, peer := range discovery.allPeers {
 		runenv.RecordMessage("Connecting to %d %s ", i, peer.Info.Addrs)
 		err := discovery.connectWithRetry(ctx, peer.Info)
@@ -130,14 +133,31 @@ func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h 
 		if err != nil {
 			fmt.Printf("error connecting to peer %s: %s\n", peer.Info.ID, err)
 		} else {
-			runenv.RecordMessage("Connection succesful to ", peer.Info.Addrs)
+			connectionCount++
+			runenv.RecordMessage("Connection succesful to %s %d", peer.Info.Addrs, connectionCount)
+			if connectionCount > 15 {
+				break
+			}
 		}
 
-	}
+	}*/
 
 	//}
 
 	return p, nil
+}
+
+func (p *PubsubNode) connectTopology(ctx context.Context) error {
+	// Default to a connect delay in the range of 0s - 1s
+	delay := time.Duration(float64(time.Second) * rand.Float64())
+
+	// Connect to other peers in the topology
+	err := p.discovery.ConnectTopology(ctx, delay)
+	if err != nil {
+		p.runenv.RecordMessage("Error connecting to topology peer: %s", err)
+	}
+
+	return nil
 }
 
 func (p *PubsubNode) Run(runtime time.Duration) error {
@@ -146,7 +166,7 @@ func (p *PubsubNode) Run(runtime time.Duration) error {
 		for _, ts := range p.topics {
 			ts.done <- struct{}{}
 		}
-
+		p.runenv.RecordMessage("Shutting down")
 		p.shutdown()
 	}()
 
@@ -274,7 +294,7 @@ func (p *PubsubNode) joinTopic(t TopicConfig, runtime time.Duration) {
 func (p *PubsubNode) consumeTopic(ts *topicState) {
 	for {
 		msg, err := ts.sub.Next(p.ctx)
-		if err != nil && err != context.Canceled {
+		if err != nil /*&& err != context.Canceled*/ {
 			p.log("error reading from %s: %s", ts.cfg.Id, err)
 			return
 		}
@@ -312,9 +332,6 @@ func (p *PubsubNode) sendMsg(seq int64, ts *topicState) {
 		p.log("error making message for topic %s: %s", ts.cfg.Id, err)
 		return
 	}
-	var data []byte
-	err = json.Unmarshal(data, msg)
-	//p.runenv.RecordMessage("Publishing message %d bytes", len(data))
 	err = ts.topic.Publish(p.ctx, msg)
 	if err != nil && err != context.Canceled {
 		p.log("error publishing to %s: %s", ts.cfg.Id, err)
@@ -331,6 +348,7 @@ func (p *PubsubNode) publishLoop(ts *topicState) {
 		case <-ts.done:
 			return
 		case <-p.ctx.Done():
+			p.runenv.RecordMessage("Publish loop done")
 			return
 		case <-ts.pubTicker.C:
 			go p.sendMsg(counter, ts)

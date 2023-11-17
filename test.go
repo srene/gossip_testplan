@@ -53,7 +53,7 @@ func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *networ
 		Enable:  true,
 		Default: network.LinkShape{
 			Latency:   time.Millisecond * 50,
-			Bandwidth: 100 * 1024 * 1024,
+			Bandwidth: 12.5 * 1000 * 1000, //Equivalent to 100Mps
 		},
 		CallbackState: "network-configured",
 		RoutingPolicy: network.AllowAll,
@@ -89,12 +89,12 @@ func listenAddrs(netclient *network.Client) []multiaddr.Multiaddr {
 	return []multiaddr.Multiaddr{listenAddr}
 }
 
-/* Called when nodes are ready to start the run, and are waiting for all other nodes to be ready
-func waitForReadyState(ctx context.Context, client tgsync.Client) error {
+// Called when nodes are ready to start the run, and are waiting for all other nodes to be ready
+func waitForReadyState(ctx context.Context, runenv *runtime.RunEnv, client tgsync.Client) error {
 	// Set a state barrier.
 
 	state := tgsync.State("ready")
-	doneCh := client.MustBarrier(ctx, state, t.params.containerNodesTotal).C
+	doneCh := client.MustBarrier(ctx, state, runenv.TestInstanceCount).C
 
 	// Signal we've entered the state.
 	_, err := client.SignalEntry(ctx, state)
@@ -113,11 +113,17 @@ func waitForReadyState(ctx context.Context, client tgsync.Client) error {
 	}
 
 	return nil
-}*/
+}
 
 func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	setup := time.Second * 30
+	warmup := time.Second * 3
+	cooldown := time.Second * 3
+	runTime := time.Second * 12
+	totalTime := setup + runTime + warmup + cooldown
+
+	ctx, cancel := context.WithTimeout(context.Background(), totalTime)
 	defer cancel()
 
 	runenv.RecordMessage("before sync.MustBoundClient")
@@ -160,7 +166,13 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 
 	peerSubscriber := NewPeerSubscriber(ctx, runenv, client, runenv.TestInstanceCount)
 
-	discovery, err := NewSyncDiscovery2(h, runenv, peerSubscriber)
+	var topology Topology
+	topology = RandomHonestTopology{
+		Count:          10,
+		PublishersOnly: false,
+	}
+
+	discovery, err := NewSyncDiscovery2(h, runenv, peerSubscriber, topology)
 
 	if err != nil {
 		return fmt.Errorf("error creating discovery service: %w", err)
@@ -221,12 +233,18 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 		return fmt.Errorf("error waiting for discovery service: %s", err)
 	}
 
+	if err := waitForReadyState(ctx, runenv, client); err != nil {
+		return err
+	}
+
 	errgrp, ctx := errgroup.WithContext(ctx)
 
 	errgrp.Go(func() (err error) {
-		p.Run(time.Minute * 1)
+		p.Run(runTime)
 		return
 	})
+
+	runenv.RecordMessage("finishing test")
 	return errgrp.Wait()
 	//runenv.RecordMessage("finishing test")
 	//time.Sleep(10 * time.Second)

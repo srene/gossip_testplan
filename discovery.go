@@ -105,7 +105,7 @@ func (t RandomHonestTopology) SelectPeers(local peer.ID, remote []PeerRegistrati
 	for _, peer := range remote {
 		// Only connect to honest nodes.
 		// If PublishersOnly is true, only connect to Publishers
-		if peer.NType == NodeTypeHonest && (!t.PublishersOnly || peer.IsPublisher) {
+		if /*peer.NType == NodeTypeHonest &&*/ !t.PublishersOnly || peer.IsPublisher {
 			filtered = append(filtered, peer)
 		}
 	}
@@ -281,12 +281,13 @@ func NewSyncDiscovery(h host.Host, runenv *runtime.RunEnv, peerSubscriber *PeerS
 	}, nil
 }
 
-func NewSyncDiscovery2(h host.Host, runenv *runtime.RunEnv, peerSubscriber *PeerSubscriber) (*SyncDiscovery, error) {
+func NewSyncDiscovery2(h host.Host, runenv *runtime.RunEnv, peerSubscriber *PeerSubscriber, topology Topology) (*SyncDiscovery, error) {
 
 	return &SyncDiscovery{
 		h:              h,
 		runenv:         runenv,
 		peerSubscriber: peerSubscriber,
+		topology:       topology,
 		//nodeIdx:        nodeIdx,
 		connected: make(map[peer.ID]PeerRegistration),
 	}, nil
@@ -343,6 +344,8 @@ func (s *SyncDiscovery) ConnectTopology(ctx context.Context, delay time.Duration
 	case <-time.After(delay):
 		s.runenv.RecordMessage("connecting to peers after %s", delay)
 	}
+
+	s.runenv.RecordMessage("selecting peers between %d", len(s.allPeers))
 
 	selected := s.topology.SelectPeers(s.h.ID(), s.allPeers)
 
