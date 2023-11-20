@@ -14,6 +14,12 @@ import (
 	"github.com/testground/sdk-go/runtime"
 )
 
+type Msg struct {
+	Sender string
+	Seq    int64
+	Data   []byte
+}
+
 type NodeConfig struct {
 	// topics to join when node starts
 	Topics []TopicConfig
@@ -24,7 +30,7 @@ type NodeConfig struct {
 	FloodPublishing bool
 
 	// pubsub event tracer
-	//Tracer pubsub.EventTracer
+	Tracer pubsub.EventTracer
 
 	// Test instance identifier
 	Seq int64
@@ -36,11 +42,11 @@ type NodeConfig struct {
 	Cooldown time.Duration
 
 	// Gossipsub heartbeat params
-	/*Heartbeat HeartbeatParams
+	Heartbeat HeartbeatParams
 
 	// whether to flood the network when publishing our own messages.
 	// Ignored unless hardening_api build tag is present.
-	FloodPublishing bool
+	//FloodPublishing bool
 
 	// Params for peer scoring function. Ignored unless hardening_api build tag is present.
 	PeerScoreParams ScoreParams
@@ -48,7 +54,7 @@ type NodeConfig struct {
 	OverlayParams OverlayParams
 
 	// Params for inspecting the scoring values.
-	PeerScoreInspect InspectParams
+	//PeerScoreInspect InspectParams
 
 	// Size of the pubsub validation queue.
 	ValidateQueueSize int
@@ -57,7 +63,7 @@ type NodeConfig struct {
 	OutboundQueueSize int
 
 	// Heartbeat tics for opportunistic grafting
-	OpportunisticGraftTicks int*/
+	OpportunisticGraftTicks int
 }
 
 type TopicConfig struct {
@@ -91,8 +97,18 @@ type PubsubNode struct {
 }
 
 func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h host.Host, discovery *SyncDiscovery, cfg NodeConfig) (*PubsubNode, error) {
+	opts, err := pubsubOptions(cfg)
+	if err != nil {
+		return nil, err
+	}
 
-	ps, err := pubsub.NewGossipSub(ctx, h)
+	if cfg.OverlayParams.d > 0 {
+		runenv.RecordMessage("Using D parameter %d", cfg.OverlayParams.d)
+	}
+	// Set the heartbeat initial delay and interval
+	pubsub.GossipSubHeartbeatInitialDelay = cfg.Heartbeat.InitialDelay
+	pubsub.GossipSubHeartbeatInterval = cfg.Heartbeat.Interval
+	ps, err := pubsub.NewGossipSub(ctx, h, opts...)
 
 	if err != nil {
 		fmt.Errorf("error making new gossipsub: %s", err)
@@ -145,6 +161,33 @@ func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h 
 	//}
 
 	return p, nil
+}
+
+func pubsubOptions(cfg NodeConfig) ([]pubsub.Option, error) {
+	opts := []pubsub.Option{
+		pubsub.WithEventTracer(cfg.Tracer),
+	}
+
+	if cfg.ValidateQueueSize > 0 {
+		opts = append(opts, pubsub.WithValidateQueueSize(cfg.ValidateQueueSize))
+	}
+
+	if cfg.OutboundQueueSize > 0 {
+		opts = append(opts, pubsub.WithPeerOutboundQueueSize(cfg.OutboundQueueSize))
+	}
+
+	// Set the overlay parameters
+	if cfg.OverlayParams.d >= 0 {
+		pubsub.GossipSubD = cfg.OverlayParams.d
+	}
+	if cfg.OverlayParams.dlo >= 0 {
+		pubsub.GossipSubDlo = cfg.OverlayParams.dlo
+	}
+	if cfg.OverlayParams.dhi >= 0 {
+		pubsub.GossipSubDhi = cfg.OverlayParams.dhi
+	}
+
+	return opts, nil
 }
 
 func (p *PubsubNode) connectTopology(ctx context.Context) error {
@@ -299,8 +342,14 @@ func (p *PubsubNode) consumeTopic(ts *topicState) {
 			return
 		}
 		//p.log("got message")
-		p.log("got message on topic %s from %s\n", ts.cfg.Id, msg.ReceivedFrom)
-
+		var message Msg
+		err = json.Unmarshal(msg.Data, &message)
+		if err != nil /*&& err != context.Canceled*/ {
+			p.log("error reading data")
+			return
+		}
+		//p.log("Data received %s", msg.Data)
+		p.log("got message %d for topic %s, sent by %s\n", message.Seq, ts.cfg.Id, msg.ReceivedFrom)
 		select {
 		case <-ts.done:
 			return
@@ -313,25 +362,27 @@ func (p *PubsubNode) consumeTopic(ts *topicState) {
 }
 
 func (p *PubsubNode) makeMessage(seq int64, size uint64) ([]byte, error) {
-	type msg struct {
-		sender string
-		seq    int64
-		data   []byte
-	}
+
 	data := make([]byte, size)
 	rand.Read(data)
-	m := msg{sender: p.h.ID().String(), seq: seq, data: data}
+
+	m := &Msg{Sender: p.h.ID().String(), Seq: seq, Data: data}
+
 	return json.Marshal(m)
 }
 
 func (p *PubsubNode) sendMsg(seq int64, ts *topicState) {
-	p.runenv.RecordMessage("Publishing message %d bytes", uint64(ts.cfg.MessageSize))
+	p.runenv.RecordMessage("Publishing message %d %d %s bytes", seq, uint64(ts.cfg.MessageSize), p.h.ID().Loggable())
 
 	msg, err := p.makeMessage(seq, uint64(ts.cfg.MessageSize))
+
+	//p.log("makeMessage %d", len(msg))
+
 	if err != nil {
 		p.log("error making message for topic %s: %s", ts.cfg.Id, err)
 		return
 	}
+
 	err = ts.topic.Publish(p.ctx, msg)
 	if err != nil && err != context.Canceled {
 		p.log("error publishing to %s: %s", ts.cfg.Id, err)

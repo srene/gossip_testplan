@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"os"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
@@ -52,8 +53,8 @@ func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *networ
 		Network: "default",
 		Enable:  true,
 		Default: network.LinkShape{
-			Latency:   time.Millisecond * 50,
-			Bandwidth: 12.5 * 1000 * 1000, //Equivalent to 100Mps
+			Latency:   time.Millisecond * 5,
+			Bandwidth: 12500000, //Equivalent to 100Mps
 		},
 		CallbackState: "network-configured",
 		RoutingPolicy: network.AllowAll,
@@ -120,11 +121,12 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 	setup := time.Second * 30
 	warmup := time.Second * 3
 	cooldown := time.Second * 3
-	runTime := time.Second * 12
+	runTime := time.Second * 10
 	totalTime := setup + runTime + warmup + cooldown
 
 	ctx, cancel := context.WithTimeout(context.Background(), totalTime)
 	defer cancel()
+	params := parseParams(runenv)
 
 	runenv.RecordMessage("before sync.MustBoundClient")
 
@@ -168,7 +170,7 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 
 	var topology Topology
 	topology = RandomHonestTopology{
-		Count:          10,
+		Count:          6,
 		PublishersOnly: false,
 	}
 
@@ -197,10 +199,8 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 		return fmt.Errorf("error waiting for discovery service: %s", err)
 	}
 
-	//tracer, err := NewTestTracer(tracerOut, h.ID(), t.params.fullTraces)
-
-	rate := ptypes.Rate{Quantity: 5, Interval: time.Minute}
-	topic := TopicConfig{Id: "block_channel", MessageRate: rate, MessageSize: 100000}
+	rate := ptypes.Rate{Quantity: 5, Interval: time.Second}
+	topic := TopicConfig{Id: "block_channel", MessageRate: rate, MessageSize: 20 * 1024}
 	var topics = make([]TopicConfig, 0)
 	topics = append(topics, topic)
 
@@ -210,21 +210,24 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 	} else {
 		pub = false
 	}
+	tracerOut := fmt.Sprintf("%s%ctracer-output-%d", runenv.TestOutputsPath, os.PathSeparator, seq)
+	tracer, err := NewTestTracer(tracerOut, h.ID(), true)
+
 	cfg := NodeConfig{
 		Publisher:       pub,
 		FloodPublishing: false,
-		//PeerScoreParams:         t.params.scoreParams,
-		//OverlayParams:           t.params.overlayParams,
+		PeerScoreParams: params.scoreParams,
+		OverlayParams:   params.overlayParams,
 		//PeerScoreInspect:        scoreInspectParams,
-		Topics: topics,
-		//	Tracer: tracer,
-		Seq:      seq,
-		Warmup:   time.Second * 3,
-		Cooldown: time.Second * 10,
-		//Heartbeat:               t.params.heartbeat,
-		//ValidateQueueSize:       t.params.validateQueueSize,
-		//OutboundQueueSize:       t.params.outboundQueueSize,
-		//OpportunisticGraftTicks: t.params.opportunisticGraftTicks,
+		Topics:                  topics,
+		Tracer:                  tracer,
+		Seq:                     seq,
+		Warmup:                  time.Second * 3,
+		Cooldown:                time.Second * 10,
+		Heartbeat:               params.heartbeat,
+		ValidateQueueSize:       params.validateQueueSize,
+		OutboundQueueSize:       params.outboundQueueSize,
+		OpportunisticGraftTicks: params.opportunisticGraftTicks,
 	}
 
 	p, err := createPubSubNode(ctx, runenv, seq, h, discovery, cfg)
@@ -241,6 +244,10 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 
 	errgrp.Go(func() (err error) {
 		p.Run(runTime)
+
+		if err2 := tracer.Stop(); err2 != nil {
+			runenv.RecordMessage("error stopping test tracer: %s", err2)
+		}
 		return
 	})
 

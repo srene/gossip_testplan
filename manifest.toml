@@ -55,24 +55,11 @@ instances = { min = 2, max = 500, default = 100 }
   publisher = { type = "bool", desc = "if true, this instance should publish to subscribed topics instead of lurking", default=false }
   flood_publishing = { type = "bool", desc = "if true, nodes will flood when publishing their own messages. only applies to hardening branch", default=false }
   t_score_inspect_period = { type = "duration", desc = "Interval between printing peer scores", default="0" }
-  overlay_d = { type = "int", desc = "the number of nodes gossipsub tries to stay connected to", default=-1 }
-  overlay_dlo = { type = "int", desc = "the low watermark of overlay_d", default=-1 }
-  overlay_dhi = { type = "int", desc = "the high watermark of overlay_d", default=-1 }
+  overlay_d = { type = "int", desc = "the number of nodes gossipsub tries to stay connected to", default=8}
+  overlay_dlo = { type = "int", desc = "the low watermark of overlay_d", default=4}
+  overlay_dhi = { type = "int", desc = "the high watermark of overlay_d", default=12 }
   overlay_dscore = { type = "int", desc = "the number of peers to keep by score", default=-1 }
   overlay_dlazy = { type = "int", desc = "degree for gossip nodes", default=-1 }
   overlay_dout  = { type = "int", desc = "outbound connection quota", default=-1 }
   gossip_factor = { type = "float", desc = "gossip factor", default=0.25 }
   opportunistic_graft_ticks = { type = "int", desc = "Number of heartbeat ticks for attempting opportunistic grafting", default=60 }
-
-  ## attack node config
-  attack_node_type = { type = "string", desc = "the type of attack this node performs: sybil / graft" }
-  attack_single_node = { type = "bool", desc = "attack a single node (rather than randomly chosen nodes)", default="false" }
-  censor_single_node = { type = "bool", desc = "censor a single node", default="false" }
-  connect_to_publishers_only = { type = "bool", desc = "only connect to publisher nodes", default="false" }
-  sybil_degrade = { type = "float", desc = "the ratio of messages that the sybil drops", default="1.0" }
-  t_sybil_attack_delay = { type = "duration", desc = "Delay before applying sybil attacks", default="0s" }
-  t_sybil_regraft_delay = { type = "duration", desc = "Max delay before sending GRAFT after being pruned", default="15s" }
-  t_sybil_regraft_backoff = { type = "duration", desc = "Backoff delay to evade the hardening backoff delay", default="60s" }
-  t_sybil_seen_cache_duration = { type = "duration", desc = "How long to cache that message has been seen", default="120s" }
-  connect_delays = { type = "string", desc = "comma-separated list of count@duration: 5@10s,15@1m", default="" }
-  connect_delay_jitter_pct = { type = "int", desc = "% jitter in connect delay", default=5 }
