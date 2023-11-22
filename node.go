@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/testground/sdk-go/ptypes"
 	"github.com/testground/sdk-go/runtime"
+	tgsync "github.com/testground/sdk-go/sync"
 )
 
 type Msg struct {
@@ -126,7 +127,7 @@ func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h 
 		topics:    make(map[string]*topicState),
 	}
 
-	p.connectTopology(ctx)
+	p.connectTopology(ctx, cfg.Warmup)
 	/*err = p.Run(t.params.runtime, func(ctx context.Context) error {
 		// wait for all other nodes to be ready
 		if err := t.waitForReadyState(ctx); err != nil {
@@ -188,10 +189,9 @@ func pubsubOptions(cfg NodeConfig) ([]pubsub.Option, error) {
 	return opts, nil
 }
 
-func (p *PubsubNode) connectTopology(ctx context.Context) error {
+func (p *PubsubNode) connectTopology(ctx context.Context, warmup time.Duration) error {
 	// Default to a connect delay in the range of 0s - 1s
-	delay := time.Duration(float64(3*time.Second) * rand.Float64())
-
+	delay := time.Duration(rand.Intn(int(warmup.Seconds()))) * time.Second
 	// Connect to other peers in the topology
 	err := p.discovery.ConnectTopology(ctx, delay)
 	if err != nil {
@@ -217,11 +217,13 @@ func (p *PubsubNode) Run(runtime time.Duration) error {
 		return err
 	}*/
 
-	// join initial topics
-	p.runenv.RecordMessage("Joining initial topics %d.", len(p.cfg.Topics))
-	for _, t := range p.cfg.Topics {
-		p.runenv.RecordMessage("Joining topic %s %d.", t.Id, t.MessageSize)
-		go p.joinTopic(t, runtime)
+	// ensure we have at least enough peers to fill a mesh after warmup period
+	npeers := len(p.h.Network().Peers())
+	if npeers < pubsub.GossipSubD {
+		//panic(fmt.Errorf("not enough peers after warmup period. Need at least D=%d, have %d", pubsub.GossipSubDlo, npeers))
+		p.runenv.RecordMessage("not enough peers after warmup period. Need at least D=%d, have %d", pubsub.GossipSubD, npeers)
+		selected := p.discovery.topology.SelectNPeers(pubsub.GossipSubD-npeers, p.h.ID(), p.discovery.allPeers)
+		p.discovery.ConnectingToPeers(p.ctx, selected)
 	}
 
 	//wait for warmup time to expire
@@ -232,10 +234,11 @@ func (p *PubsubNode) Run(runtime time.Duration) error {
 		return p.ctx.Err()
 	}
 
-	// ensure we have at least enough peers to fill a mesh after warmup period
-	npeers := len(p.h.Network().Peers())
-	if npeers < pubsub.GossipSubD {
-		panic(fmt.Errorf("not enough peers after warmup period. Need at least D=%d, have %d", pubsub.GossipSubD, npeers))
+	// join initial topics
+	p.runenv.RecordMessage("Joining initial topics %d.", len(p.cfg.Topics))
+	for _, t := range p.cfg.Topics {
+		p.runenv.RecordMessage("Joining topic %s %d.", t.Id, t.MessageSize)
+		go p.joinTopic(t, runtime)
 	}
 
 	p.runenv.RecordMessage("Starting gossipsub. Connected to %d peers.", len(p.h.Network().Peers()))
@@ -313,23 +316,53 @@ func (p *PubsubNode) joinTopic(t TopicConfig, runtime time.Duration) {
 	p.topics[t.Id] = &ts
 	go p.consumeTopic(&ts)
 
+	if err := waitTillAllJoined(p.ctx, p.runenv, tgsync.MustBoundClient(p.ctx, p.runenv)); err != nil {
+		return
+	}
+
 	if !p.cfg.Publisher {
 		return
 	}
 
 	go func() {
-		p.runenv.RecordMessage("Wait for %s warmup time before starting publisher", p.cfg.Warmup)
+		/*p.runenv.RecordMessage("Wait for %s warmup time before starting publisher", "10s")
 		select {
-		case <-time.After(p.cfg.Warmup):
+		case <-time.After(time.Second * 50):
 		case <-p.ctx.Done():
 			p.runenv.RecordMessage("Context done before warm up time in publisher: %s", p.ctx.Err())
 			return
-		}
+		}*/
 
 		p.runenv.RecordMessage("Starting publisher with %s publish interval", publishInterval)
 		ts.pubTicker = time.NewTicker(publishInterval)
 		p.publishLoop(&ts)
 	}()
+}
+
+// Called when nodes are ready to start the run, and are waiting for all other nodes to be ready
+func waitTillAllJoined(ctx context.Context, runenv *runtime.RunEnv, client tgsync.Client) error {
+	// Set a state barrier.
+
+	state := tgsync.State("joined")
+	doneCh := client.MustBarrier(ctx, state, runenv.TestInstanceCount).C
+
+	// Signal we've entered the state.
+	_, err := client.SignalEntry(ctx, state)
+	if err != nil {
+		return err
+	}
+
+	// Wait until all others have signalled.
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-doneCh:
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (p *PubsubNode) consumeTopic(ts *topicState) {
@@ -400,6 +433,9 @@ func (p *PubsubNode) publishLoop(ts *topicState) {
 			p.runenv.RecordMessage("Publish loop done")
 			return
 		case <-ts.pubTicker.C:
+			for id := range p.ps.ListPeers(ts.sub.Topic()) {
+				p.runenv.RecordMessage("Connected to %d", id)
+			}
 			go p.sendMsg(counter, ts)
 			counter++
 			if counter > ts.nMessages {

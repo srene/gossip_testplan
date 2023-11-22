@@ -53,7 +53,7 @@ func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *networ
 
 	bw := uint64(bandwidth) * 1000 * 1000
 
-	runenv.RecordMessage("Network params %d %d", lat, bw)
+	runenv.RecordMessage("Network params %d %d", lat.Seconds(), bw)
 
 	config := &network.Config{
 		Network: "default",
@@ -176,12 +176,10 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 	peerSubscriber := NewPeerSubscriber(ctx, runenv, client, runenv.TestInstanceCount)
 
 	var topology Topology
-	topology = RandomHonestTopology{
-		Count:          params.overlayParams.d,
-		PublishersOnly: false,
-	}
+	topology = RandomTopology{
+		Count: 2}
 
-	discovery, err := NewSyncDiscovery(h, runenv, peerSubscriber, topology)
+	discovery, err := NewSyncDiscovery(h, seq, runenv, peerSubscriber, topology)
 
 	if err != nil {
 		return fmt.Errorf("error creating discovery service: %w", err)
@@ -231,8 +229,8 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 		Topics:                  topics,
 		Tracer:                  tracer,
 		Seq:                     seq,
-		Warmup:                  time.Second * 3,
-		Cooldown:                time.Second * 10,
+		Warmup:                  params.warmup,
+		Cooldown:                params.cooldown,
 		Heartbeat:               params.heartbeat,
 		ValidateQueueSize:       params.validateQueueSize,
 		OutboundQueueSize:       params.outboundQueueSize,
@@ -261,10 +259,6 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 		return
 	})
 
-	runenv.RecordMessage("finishing test")
 	return errgrp.Wait()
-	//runenv.RecordMessage("finishing test")
-	//time.Sleep(10 * time.Second)
 
-	//return nil
 }

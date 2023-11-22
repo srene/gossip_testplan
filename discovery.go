@@ -46,9 +46,9 @@ type SyncDiscovery struct {
 	runenv         *runtime.RunEnv
 	peerSubscriber *PeerSubscriber
 	topology       Topology
-	nodeType       NodeType
-	nodeTypeSeq    int64
-	isPublisher    bool
+	//nodeType       NodeType
+	nodeTypeSeq int64
+	isPublisher bool
 
 	// All peers in the test
 	allPeers []PeerRegistration
@@ -61,6 +61,7 @@ type SyncDiscovery struct {
 // A Topology filters the set of all nodes
 type Topology interface {
 	SelectPeers(local peer.ID, remote []PeerRegistration) []PeerRegistration
+	SelectNPeers(n int, local peer.ID, remote []PeerRegistration) []PeerRegistration
 }
 
 // RandomTopology selects a subset of the total nodes at random
@@ -75,6 +76,23 @@ func (t RandomTopology) SelectPeers(local peer.ID, remote []PeerRegistration) []
 	}
 
 	n := t.Count
+	if n > len(remote) {
+		n = len(remote)
+	}
+
+	indices := rand.Perm(len(remote))
+	out := make([]PeerRegistration, n)
+	for i := 0; i < n; i++ {
+		out[i] = remote[indices[i]]
+	}
+	return out
+}
+
+func (t RandomTopology) SelectNPeers(n int, local peer.ID, remote []PeerRegistration) []PeerRegistration {
+	if len(remote) == 0 || n == 0 {
+		return []PeerRegistration{}
+	}
+
 	if n > len(remote) {
 		n = len(remote)
 	}
@@ -161,11 +179,12 @@ func (t FixedTopology) SelectPeers(local peer.ID, remote []PeerRegistration) []P
 		if len(parts) != 3 {
 			panic(fmt.Sprintf("Badly formatted topology file"))
 		}
-		nodeType := parts[0]
-		nodeTypeSeq := parts[1]
+		//nodeType := parts[0]
+		nodeTypeSeq := parts[0]
 		//nodeIdx := parts[2]
 		for _, p := range remote {
-			if nodeType == string(p.NType) && nodeTypeSeq == strconv.Itoa(int(p.NodeTypeSeq)) {
+			//if nodeType == string(p.NType) && nodeTypeSeq == strconv.Itoa(int(p.NodeTypeSeq)) {
+			if nodeTypeSeq == strconv.Itoa(int(p.NodeTypeSeq)) {
 				out = append(out, p)
 			}
 		}
@@ -176,8 +195,8 @@ func (t FixedTopology) SelectPeers(local peer.ID, remote []PeerRegistration) []P
 // PeerRegistration contains the addresses, sequence numbers and node type (honest / sybil / etc)
 // for each peer in the test. It is shared with every other peer using the sync service.
 type PeerRegistration struct {
-	Info        peer.AddrInfo
-	NType       NodeType
+	Info peer.AddrInfo
+	//NType       NodeType
 	NodeTypeSeq int64
 	IsPublisher bool
 }
@@ -281,13 +300,14 @@ func (ps *PeerSubscriber) waitForPeers(ctx context.Context) ([]PeerRegistration,
 	}, nil
 }*/
 
-func NewSyncDiscovery(h host.Host, runenv *runtime.RunEnv, peerSubscriber *PeerSubscriber, topology Topology) (*SyncDiscovery, error) {
+func NewSyncDiscovery(h host.Host, seq int64, runenv *runtime.RunEnv, peerSubscriber *PeerSubscriber, topology Topology) (*SyncDiscovery, error) {
 
 	return &SyncDiscovery{
 		h:              h,
 		runenv:         runenv,
 		peerSubscriber: peerSubscriber,
 		topology:       topology,
+		nodeTypeSeq:    seq,
 		//nodeIdx:        nodeIdx,
 		connected: make(map[peer.ID]PeerRegistration),
 	}, nil
@@ -298,8 +318,8 @@ func (s *SyncDiscovery) registerAndWait(ctx context.Context) error {
 	// Register this node's information
 	localPeer := *host.InfoFromHost(s.h)
 	entry := PeerRegistration{
-		Info:        localPeer,
-		NType:       s.nodeType,
+		Info: localPeer,
+		//NType:       s.nodeType,
 		NodeTypeSeq: s.nodeTypeSeq,
 		//NodeIdx:     s.nodeIdx,
 		IsPublisher: s.isPublisher,
@@ -361,7 +381,7 @@ func (s *SyncDiscovery) ConnectTopology(ctx context.Context, delay time.Duration
 		p := p
 		if _, ok := s.connected[p.Info.ID]; !ok {
 			s.connected[p.Info.ID] = p
-			s.runenv.RecordMessage("%s-%d connecting to %s-%d\n", s.nodeType, s.nodeTypeSeq /* s.nodeIdx,*/, p.NType, p.NodeTypeSeq /*, p.NodeIdx*/)
+			s.runenv.RecordMessage("%d connecting to %d\n", s.nodeTypeSeq, p.NodeTypeSeq)
 			errgrp.Go(func() error {
 				err := s.connectWithRetry(ctx, p.Info)
 				if err != nil {
@@ -369,8 +389,47 @@ func (s *SyncDiscovery) ConnectTopology(ctx context.Context, delay time.Duration
 				}
 				conns := s.h.Network().ConnsToPeer(p.Info.ID)
 				for _, conn := range conns {
-					s.runenv.RecordMessage("%s-%d connected to %s-%d. local addr: %s remote addr: %s\n",
-						s.nodeType, s.nodeTypeSeq /* s.nodeIdx,*/, p.NType, p.NodeTypeSeq, /*p.NodeIdx,*/
+					s.runenv.RecordMessage("%d connected to %d. local addr: %s remote addr: %s\n",
+						s.nodeTypeSeq, p.NodeTypeSeq,
+						conn.LocalMultiaddr(), conn.RemoteMultiaddr())
+				}
+				return err
+			})
+		}
+	}
+
+	s.connectedLk.Unlock()
+
+	return errgrp.Wait()
+}
+
+// Connect to all peers in the topology
+func (s *SyncDiscovery) ConnectingToPeers(ctx context.Context, peers []PeerRegistration) error {
+
+	selected := peers
+
+	s.runenv.RecordMessage("Connecting topology with %d nodes", len(selected))
+	if len(selected) == 0 {
+		panic("topology selected zero peers. so lonely!!!")
+	}
+
+	s.connectedLk.Lock()
+
+	errgrp, ctx := errgroup.WithContext(ctx)
+	for _, p := range selected {
+		p := p
+		if _, ok := s.connected[p.Info.ID]; !ok {
+			s.connected[p.Info.ID] = p
+			s.runenv.RecordMessage("%d connecting to %d\n", s.nodeTypeSeq, p.NodeTypeSeq)
+			errgrp.Go(func() error {
+				err := s.connectWithRetry(ctx, p.Info)
+				if err != nil {
+					s.runenv.RecordMessage("error connecting libp2p host: %s", err)
+				}
+				conns := s.h.Network().ConnsToPeer(p.Info.ID)
+				for _, conn := range conns {
+					s.runenv.RecordMessage("%d connected to %d. local addr: %s remote addr: %s\n",
+						s.nodeTypeSeq, p.NodeTypeSeq,
 						conn.LocalMultiaddr(), conn.RemoteMultiaddr())
 				}
 				return err

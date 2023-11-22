@@ -35,7 +35,7 @@ instances = { min = 2, max = 500, default = 100 }
   t_heartbeat_initial_delay = { type = "duration", desc = "Delay before starting hearbeat", default="100ms" }
   t_setup = { type = "duration", desc = "Upper bound on expected time period for waiting for all peers to register etc", default="1m" }
   t_run = { type = "duration", desc = "Time to run the simulation", default="1m" }
-  t_warm = { type = "duration", desc = "Time to wait for nodes to establish connections before beginning publishing", default="5s" }
+  t_warm = { type = "duration", desc = "Time to wait for nodes to establish connections before beginning publishing", default="20s" }
   t_cool = { type = "duration", desc = "Time to wait after test execution for straggling publishers, etc.", default="10s" }
   topics = { type = "json", desc = "json array of TopicConfig objects." }
   score_params = { type = "json", desc = "a json ScoreParams object (see params.go). ignored unless hardened_api build flag is set."}
