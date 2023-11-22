@@ -36,7 +36,7 @@ func createHost(ctx context.Context) (host.Host, error) {
 
 // setupNetwork instructs the sidecar (if enabled) to setup the network for this
 // test case.
-func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *network.Client) error {
+func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *network.Client, latencyMin int, latencyMax int) error {
 	if !runenv.TestSidecar {
 		return nil
 	}
@@ -49,11 +49,13 @@ func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *networ
 	}
 	runenv.RecordMessage("Network init complete")
 
+	lat := time.Duration(rand.Intn(latencyMax-latencyMin)+latencyMin) * time.Millisecond
+
 	config := &network.Config{
 		Network: "default",
 		Enable:  true,
 		Default: network.LinkShape{
-			Latency:   time.Millisecond * 10,
+			Latency:   lat,
 			Bandwidth: 1000000000, //Equivalent to 100Mps
 		},
 		CallbackState: "network-configured",
@@ -160,7 +162,7 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 
 	runenv.RecordMessage("before netclient.MustConfigureNetwork")
 
-	if err := setupNetwork(ctx, runenv, netclient); err != nil {
+	if err := setupNetwork(ctx, runenv, netclient, params.netParams.latencyMax, params.netParams.latencyMax); err != nil {
 		return fmt.Errorf("Failed to set up network: %w", err)
 	}
 
@@ -175,7 +177,7 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 		PublishersOnly: false,
 	}
 
-	discovery, err := NewSyncDiscovery2(h, runenv, peerSubscriber, topology)
+	discovery, err := NewSyncDiscovery(h, runenv, peerSubscriber, topology)
 
 	if err != nil {
 		return fmt.Errorf("error creating discovery service: %w", err)
@@ -200,8 +202,10 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 		return fmt.Errorf("error waiting for discovery service: %s", err)
 	}
 
-	rate := ptypes.Rate{Quantity: 5, Interval: time.Second}
-	topic := TopicConfig{Id: "block_channel", MessageRate: rate, MessageSize: 300 * 1024}
+	blocks_second := params.blocks_second
+	block_size := params.block_size
+	rate := ptypes.Rate{Quantity: float64(blocks_second), Interval: time.Second}
+	topic := TopicConfig{Id: "block_channel", MessageRate: rate, MessageSize: ptypes.Size(block_size)}
 	var topics = make([]TopicConfig, 0)
 	topics = append(topics, topic)
 

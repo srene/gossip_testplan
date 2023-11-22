@@ -266,7 +266,7 @@ func (ps *PeerSubscriber) waitForPeers(ctx context.Context) ([]PeerRegistration,
 	return ps.peers, nil
 }
 
-func NewSyncDiscovery(h host.Host, runenv *runtime.RunEnv, peerSubscriber *PeerSubscriber, topology Topology, nodeType NodeType, nodeTypeSeq int64, nodeIdx int, isPublisher bool) (*SyncDiscovery, error) {
+/*func NewSyncDiscovery(h host.Host, runenv *runtime.RunEnv, peerSubscriber *PeerSubscriber, topology Topology, nodeType NodeType, nodeTypeSeq int64, nodeIdx int, isPublisher bool) (*SyncDiscovery, error) {
 
 	return &SyncDiscovery{
 		h:              h,
@@ -279,9 +279,9 @@ func NewSyncDiscovery(h host.Host, runenv *runtime.RunEnv, peerSubscriber *PeerS
 		isPublisher: isPublisher,
 		connected:   make(map[peer.ID]PeerRegistration),
 	}, nil
-}
+}*/
 
-func NewSyncDiscovery2(h host.Host, runenv *runtime.RunEnv, peerSubscriber *PeerSubscriber, topology Topology) (*SyncDiscovery, error) {
+func NewSyncDiscovery(h host.Host, runenv *runtime.RunEnv, peerSubscriber *PeerSubscriber, topology Topology) (*SyncDiscovery, error) {
 
 	return &SyncDiscovery{
 		h:              h,

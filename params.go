@@ -17,8 +17,8 @@ type HeartbeatParams struct {
 }
 
 type NetworkParams struct {
-	latency     time.Duration
-	latencyMax  time.Duration
+	latency     int
+	latencyMax  int
 	jitterPct   int
 	bandwidthMB int
 }
@@ -118,6 +118,9 @@ type testParams struct {
 	outboundQueueSize  int
 
 	opportunisticGraftTicks int
+
+	block_size    int
+	blocks_second int
 }
 
 func durationParam(runenv *runtime.RunEnv, name string) time.Duration {
@@ -141,9 +144,10 @@ func parseDuration(val string) time.Duration {
 }
 
 func parseParams(runenv *runtime.RunEnv) testParams {
+
 	np := NetworkParams{
-		latency:     durationParam(runenv, "t_latency"),
-		latencyMax:  durationParam(runenv, "t_latency_max"),
+		latency:     runenv.IntParam("t_latency"),
+		latencyMax:  runenv.IntParam("t_latency_max"),
 		jitterPct:   runenv.IntParam("jitter_pct"),
 		bandwidthMB: runenv.IntParam("bandwidth_mb"),
 	}
@@ -183,6 +187,8 @@ func parseParams(runenv *runtime.RunEnv) testParams {
 		validateQueueSize:       runenv.IntParam("validate_queue_size"),
 		outboundQueueSize:       runenv.IntParam("outbound_queue_size"),
 		opportunisticGraftTicks: runenv.IntParam("opportunistic_graft_ticks"),
+		block_size:              runenv.IntParam("block_size"),
+		blocks_second:           runenv.IntParam("blocks_second"),
 	}
 
 	if runenv.IsParamSet("topics") {
