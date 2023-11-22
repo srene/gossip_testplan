@@ -45,7 +45,7 @@ instances = { min = 2, max = 500, default = 100 }
   t_latency = { type = "int", desc = "Network latency between nodes", default="5" }
   t_latency_max = { type = "int", desc = "If supplied, latency is between t_latency and t_latency_max", default="100" }
   jitter_pct = { type = "int", desc = "Jitter in latency", default=10 }
-  bandwidth_mb = { type = "int", desc = "Bandwidth in MiB", default=10240 }
+  bandwidth_mb = { type = "int", desc = "Bandwidth in Mbps", default=100 }
   topology = { type = "string", desc = "topology in json format" }
   degree = { type = "int", desc = "the number of nodes to connect to", default=20 }
   n_container_nodes_total = { type = "int", desc = "the number of total nodes including multiple nodes per container", default=1 }

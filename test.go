@@ -36,7 +36,7 @@ func createHost(ctx context.Context) (host.Host, error) {
 
 // setupNetwork instructs the sidecar (if enabled) to setup the network for this
 // test case.
-func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *network.Client, latencyMin int, latencyMax int) error {
+func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *network.Client, latencyMin int, latencyMax int, bandwidth int) error {
 	if !runenv.TestSidecar {
 		return nil
 	}
@@ -49,14 +49,18 @@ func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *networ
 	}
 	runenv.RecordMessage("Network init complete")
 
-	lat := time.Duration(rand.Intn(latencyMax-latencyMin)+latencyMin) * time.Millisecond
+	lat := time.Duration(rand.Intn(latencyMax-latencyMin) + latencyMin)
+
+	bw := uint64(bandwidth) * 1000 * 1000
+
+	runenv.RecordMessage("Network params %d %d", lat, bw)
 
 	config := &network.Config{
 		Network: "default",
 		Enable:  true,
 		Default: network.LinkShape{
-			Latency:   lat,
-			Bandwidth: 1000000000, //Equivalent to 100Mps
+			Latency:   lat * time.Millisecond,
+			Bandwidth: bw, //Equivalent to 100Mps
 		},
 		CallbackState: "network-configured",
 		RoutingPolicy: network.DenyAll,
@@ -162,7 +166,7 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 
 	runenv.RecordMessage("before netclient.MustConfigureNetwork")
 
-	if err := setupNetwork(ctx, runenv, netclient, params.netParams.latencyMax, params.netParams.latencyMax); err != nil {
+	if err := setupNetwork(ctx, runenv, netclient, params.netParams.latency, params.netParams.latencyMax, params.netParams.bandwidthMB); err != nil {
 		return fmt.Errorf("Failed to set up network: %w", err)
 	}
 
