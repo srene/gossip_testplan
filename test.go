@@ -118,15 +118,16 @@ func waitForReadyState(ctx context.Context, runenv *runtime.RunEnv, client tgsyn
 
 func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 
-	setup := time.Second * 30
-	warmup := time.Second * 3
-	cooldown := time.Second * 3
-	runTime := time.Second * 10
+	params := parseParams(runenv)
+
+	setup := params.setup
+	warmup := params.warmup
+	cooldown := params.cooldown
+	runTime := params.runtime
 	totalTime := setup + runTime + warmup + cooldown
 
-	ctx, cancel := context.WithTimeout(context.Background(), totalTime*10)
+	ctx, cancel := context.WithTimeout(context.Background(), totalTime)
 	defer cancel()
-	params := parseParams(runenv)
 
 	runenv.RecordMessage("before sync.MustBoundClient")
 
@@ -200,7 +201,7 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 	}
 
 	rate := ptypes.Rate{Quantity: 5, Interval: time.Second}
-	topic := TopicConfig{Id: "block_channel", MessageRate: rate, MessageSize: 500 * 1024}
+	topic := TopicConfig{Id: "block_channel", MessageRate: rate, MessageSize: 300 * 1024}
 	var topics = make([]TopicConfig, 0)
 	topics = append(topics, topic)
 

@@ -51,7 +51,7 @@ instances = { min = 2, max = 500, default = 100 }
   n_container_nodes_total = { type = "int", desc = "the number of total nodes including multiple nodes per container", default=1 }
   n_nodes_per_container = { type = "int", desc = "the number of nodes to start up in each container", default=1 }
 
-  ## honest node config
+  ## node config
   publisher = { type = "bool", desc = "if true, this instance should publish to subscribed topics instead of lurking", default=false }
   flood_publishing = { type = "bool", desc = "if true, nodes will flood when publishing their own messages. only applies to hardening branch", default=false }
   t_score_inspect_period = { type = "duration", desc = "Interval between printing peer scores", default="0" }
@@ -63,3 +63,7 @@ instances = { min = 2, max = 500, default = 100 }
   overlay_dout  = { type = "int", desc = "outbound connection quota", default=-1 }
   gossip_factor = { type = "float", desc = "gossip factor", default=0.25 }
   opportunistic_graft_ticks = { type = "int", desc = "Number of heartbeat ticks for attempting opportunistic grafting", default=60 }
+
+  ## block 
+  block_size = { type = "int", desc = "block size transmitted", default=1024*100}
+  block_time = { type = "duration", desc = "block frequency", default=1024*100}

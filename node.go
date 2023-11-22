@@ -105,6 +105,7 @@ func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h 
 	// Set the heartbeat initial delay and interval
 	pubsub.GossipSubHeartbeatInitialDelay = cfg.Heartbeat.InitialDelay
 	pubsub.GossipSubHeartbeatInterval = cfg.Heartbeat.Interval
+
 	ps, err := pubsub.NewGossipSub(ctx, h, opts...)
 
 	if err != nil {

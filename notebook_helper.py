@@ -320,6 +320,8 @@ def do_mesh_to_pandas(aggregate_output_dir, pandas_output_dir, peers_table, samp
     return df
 
 def to_panda(aggregate_output_dir, pandas_output_dir, include_mesh=False):
+
+    mkdirp(pandas_output_dir)
     print('converting latency cdf to pandas...')
     #outfile = os.path.join(pandas_output_dir, 'cdf.gz')
     cdf_file = os.path.join(aggregate_output_dir, 'tracestat-cdf.txt')
