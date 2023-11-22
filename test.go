@@ -53,11 +53,11 @@ func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *networ
 		Network: "default",
 		Enable:  true,
 		Default: network.LinkShape{
-			Latency:   time.Millisecond * 5,
-			Bandwidth: 12500000, //Equivalent to 100Mps
+			Latency:   time.Millisecond * 10,
+			Bandwidth: 1000000000, //Equivalent to 100Mps
 		},
 		CallbackState: "network-configured",
-		RoutingPolicy: network.AllowAll,
+		RoutingPolicy: network.DenyAll,
 	}
 
 	// random delay to avoid overloading weave (we hope)
@@ -124,7 +124,7 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 	runTime := time.Second * 10
 	totalTime := setup + runTime + warmup + cooldown
 
-	ctx, cancel := context.WithTimeout(context.Background(), totalTime)
+	ctx, cancel := context.WithTimeout(context.Background(), totalTime*10)
 	defer cancel()
 	params := parseParams(runenv)
 
@@ -170,7 +170,7 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 
 	var topology Topology
 	topology = RandomHonestTopology{
-		Count:          6,
+		Count:          params.overlayParams.d,
 		PublishersOnly: false,
 	}
 
@@ -200,7 +200,7 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 	}
 
 	rate := ptypes.Rate{Quantity: 5, Interval: time.Second}
-	topic := TopicConfig{Id: "block_channel", MessageRate: rate, MessageSize: 20 * 1024}
+	topic := TopicConfig{Id: "block_channel", MessageRate: rate, MessageSize: 500 * 1024}
 	var topics = make([]TopicConfig, 0)
 	topics = append(topics, topic)
 
@@ -245,6 +245,7 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 	errgrp.Go(func() (err error) {
 		p.Run(runTime)
 
+		runenv.RecordMessage("Host peer ID: %s, seq %d, addrs: %v", id, seq, h.Addrs())
 		if err2 := tracer.Stop(); err2 != nil {
 			runenv.RecordMessage("error stopping test tracer: %s", err2)
 		}

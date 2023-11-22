@@ -103,3 +103,5 @@ require (
 	lukechampine.com/blake3 v1.2.1 // indirect
 	nhooyr.io/websocket v1.8.6 // indirect
 )
+
+//replace github.com/libp2p/go-libp2p-pubsub => ../go-libp2p-pubsub/

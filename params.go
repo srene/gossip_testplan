@@ -246,7 +246,7 @@ func parseParams(runenv *runtime.RunEnv) testParams {
 	return p
 }
 
-func parseNodeType(nt string) NodeType {
+/*func parseNodeType(nt string) NodeType {
 	switch nt {
 	case string(NodeTypeSybil):
 		return NodeTypeSybil
@@ -255,4 +255,4 @@ func parseNodeType(nt string) NodeType {
 	default:
 		return NodeTypeHonest
 	}
-}
+}*/

@@ -21,15 +21,15 @@ import (
 
 type NodeType string
 
-const (
+/*const (
 	NodeTypeSybil  NodeType = "sybil"
 	NodeTypeGraft  NodeType = "graft"
 	NodeTypeHonest NodeType = "honest"
-)
+)*/
 
 const (
 	PeerConnectTimeout = time.Second * 10
-	MaxConnectRetries  = 5
+	MaxConnectRetries  = 10
 )
 
 type ConnectionsDef struct {

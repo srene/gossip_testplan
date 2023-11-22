@@ -102,9 +102,6 @@ func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h 
 		return nil, err
 	}
 
-	if cfg.OverlayParams.d > 0 {
-		runenv.RecordMessage("Using D parameter %d", cfg.OverlayParams.d)
-	}
 	// Set the heartbeat initial delay and interval
 	pubsub.GossipSubHeartbeatInitialDelay = cfg.Heartbeat.InitialDelay
 	pubsub.GossipSubHeartbeatInterval = cfg.Heartbeat.Interval
@@ -192,7 +189,7 @@ func pubsubOptions(cfg NodeConfig) ([]pubsub.Option, error) {
 
 func (p *PubsubNode) connectTopology(ctx context.Context) error {
 	// Default to a connect delay in the range of 0s - 1s
-	delay := time.Duration(float64(time.Second) * rand.Float64())
+	delay := time.Duration(float64(3*time.Second) * rand.Float64())
 
 	// Connect to other peers in the topology
 	err := p.discovery.ConnectTopology(ctx, delay)
