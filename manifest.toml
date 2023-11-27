@@ -34,7 +34,7 @@ instances = { min = 2, max = 500, default = 100 }
   t_heartbeat = { type = "duration", desc = "Interval between emiting maintenance messages", default="1s" }
   t_heartbeat_initial_delay = { type = "duration", desc = "Delay before starting hearbeat", default="100ms" }
   t_setup = { type = "duration", desc = "Upper bound on expected time period for waiting for all peers to register etc", default="1m" }
-  t_run = { type = "duration", desc = "Time to run the simulation", default="1m" }
+  t_run = { type = "duration", desc = "Time to run the simulation", default="10s" }
   t_warm = { type = "duration", desc = "Time to wait for nodes to establish connections before beginning publishing", default="20s" }
   t_cool = { type = "duration", desc = "Time to wait after test execution for straggling publishers, etc.", default="10s" }
   topics = { type = "json", desc = "json array of TopicConfig objects." }
@@ -51,7 +51,8 @@ instances = { min = 2, max = 500, default = 100 }
   degree = { type = "int", desc = "the number of nodes to connect to", default=20 }
   n_container_nodes_total = { type = "int", desc = "the number of total nodes including multiple nodes per container", default=1 }
   n_nodes_per_container = { type = "int", desc = "the number of nodes to start up in each container", default=1 }
-
+  node_failing = { type = "int", desc = "if enabled, a random node fails for a certain time ", default=5 }
+  t_node_failure = { type = "duration", desc = "Time a node is down to test node failures.", default="10s" }
   ## node config
   publisher = { type = "bool", desc = "if true, this instance should publish to subscribed topics instead of lurking", default=false }
   flood_publishing = { type = "bool", desc = "if true, nodes will flood when publishing their own messages. only applies to hardening branch", default=false }

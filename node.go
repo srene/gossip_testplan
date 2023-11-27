@@ -45,6 +45,9 @@ type NodeConfig struct {
 	// Gossipsub heartbeat params
 	Heartbeat HeartbeatParams
 
+	Failure bool
+
+	FailureDuration time.Duration
 	// whether to flood the network when publishing our own messages.
 	// Ignored unless hardening_api build tag is present.
 	//FloodPublishing bool
@@ -93,8 +96,7 @@ type PubsubNode struct {
 	discovery *SyncDiscovery
 	lk        sync.RWMutex
 	topics    map[string]*topicState
-
-	pubwg sync.WaitGroup
+	pubwg     sync.WaitGroup
 }
 
 func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h host.Host, discovery *SyncDiscovery, cfg NodeConfig) (*PubsubNode, error) {
@@ -233,7 +235,6 @@ func (p *PubsubNode) Run(runtime time.Duration) error {
 	case <-p.ctx.Done():
 		return p.ctx.Err()
 	}
-
 	// join initial topics
 	p.runenv.RecordMessage("Joining initial topics %d.", len(p.cfg.Topics))
 	for _, t := range p.cfg.Topics {

@@ -93,12 +93,14 @@ type testParams struct {
 	runtime   time.Duration
 	cooldown  time.Duration
 
-	nodeType        NodeType
-	publisher       bool
-	floodPublishing bool
-	fullTraces      bool
-	topics          []TopicConfig
-	degree          int
+	nodeType          NodeType
+	publisher         bool
+	floodPublishing   bool
+	fullTraces        bool
+	topics            []TopicConfig
+	degree            int
+	node_failing      int
+	node_failure_time time.Duration
 
 	containerNodesTotal int
 	nodesPerContainer   int
@@ -181,6 +183,8 @@ func parseParams(runenv *runtime.RunEnv) testParams {
 		censorSingleNode:        runenv.BooleanParam("censor_single_node"),
 		connectToPublishersOnly: runenv.BooleanParam("connect_to_publishers_only"),
 		degree:                  runenv.IntParam("degree"),
+		node_failing:            runenv.IntParam("node_failing"),
+		node_failure_time:       durationParam(runenv, "t_node_failure"),
 		containerNodesTotal:     runenv.IntParam("n_container_nodes_total"),
 		nodesPerContainer:       runenv.IntParam("n_nodes_per_container"),
 		scoreInspectPeriod:      durationParam(runenv, "t_score_inspect_period"),

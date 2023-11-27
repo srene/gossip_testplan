@@ -232,11 +232,20 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 	tracerOut := fmt.Sprintf("%s%ctracer-output-%d", runenv.TestOutputsPath, os.PathSeparator, seq)
 	tracer, err := NewTestTracer(tracerOut, h.ID(), true)
 
+	nodeFailing := false
+
+	if seq == int64(params.node_failing) {
+		nodeFailing = true
+		runenv.RecordMessage("Enabling failure for node %d !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", seq)
+	}
+
 	cfg := NodeConfig{
 		Publisher:       pub,
 		FloodPublishing: false,
 		PeerScoreParams: params.scoreParams,
 		OverlayParams:   params.overlayParams,
+		FailureDuration: params.node_failure_time,
+		Failure:         nodeFailing,
 		//PeerScoreInspect:        scoreInspectParams,
 		Topics:                  topics,
 		Tracer:                  tracer,
