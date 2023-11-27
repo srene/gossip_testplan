@@ -21,6 +21,7 @@ type NetworkParams struct {
 	latencyMax  int
 	jitterPct   int
 	bandwidthMB int
+	quic        bool
 }
 
 // ScoreParams is mapped to pubsub.PeerScoreParams when targeting the hardened_api pubsub branch
@@ -150,6 +151,7 @@ func parseParams(runenv *runtime.RunEnv) testParams {
 		latencyMax:  runenv.IntParam("t_latency_max"),
 		jitterPct:   runenv.IntParam("jitter_pct"),
 		bandwidthMB: runenv.IntParam("bandwidth_mb"),
+		quic:        runenv.BooleanParam("quic"),
 	}
 
 	op := OverlayParams{

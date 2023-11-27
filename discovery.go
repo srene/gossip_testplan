@@ -446,7 +446,7 @@ func (s *SyncDiscovery) connectWithRetry(ctx context.Context, p peer.AddrInfo) e
 	return retry.Do(
 		func() error {
 			// add a random delay to each connection attempt to spread the network load
-			connectDelay := time.Duration(rand.Intn(1000)) * time.Millisecond
+			connectDelay := time.Duration(rand.Intn(10000)) * time.Millisecond
 			<-time.After(connectDelay)
 
 			boundedCtx, cancel := context.WithTimeout(ctx, PeerConnectTimeout)

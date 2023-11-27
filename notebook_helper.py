@@ -138,6 +138,11 @@ def cdf_to_pandas(cdf_filepath):
         return pd.DataFrame([], columns=['delay_ms', 'count'], dtype='int64')
 
 
+def cdf_to_pandas_single(cdf_filepath):
+    if os.path.exists(cdf_filepath):
+        return pd.read_csv(cdf_filepath, delim_whitespace=True, names=['delay_ms'], dtype='int64')
+    else:
+        return pd.DataFrame([], columns=['delay_ms', 'count'], dtype='int64')
 def peer_info_to_pandas(peer_info_filename):
     with open(peer_info_filename, 'rt') as f:
         data = json.load(f)
@@ -319,7 +324,7 @@ def do_mesh_to_pandas(aggregate_output_dir, pandas_output_dir, peers_table, samp
     df.to_pickle(outfile)
     return df
 
-def to_panda(aggregate_output_dir, pandas_output_dir, include_mesh=False):
+def cdf_to_panda(aggregate_output_dir, pandas_output_dir, include_mesh=False):
 
     mkdirp(pandas_output_dir)
     print('converting latency cdf to pandas...')
@@ -332,6 +337,44 @@ def to_panda(aggregate_output_dir, pandas_output_dir, include_mesh=False):
     #df.to_pickle(outfile)
     df.to_csv(outfile)
 
+def hops_to_panda(aggregate_output_dir, pandas_output_dir, include_mesh=False):
+
+    mkdirp(pandas_output_dir)
+    print('converting number of hops to pandas...')
+    #outfile = os.path.join(pandas_output_dir, 'cdf.gz')
+    cdf_file = os.path.join(aggregate_output_dir, 'tracestat-hops.txt')
+    df = cdf_to_pandas(cdf_file)
+    #print(df)
+    outfile = os.path.join(pandas_output_dir, 'hops.csv')
+    print('writing cdf pandas data to {}'.format(outfile))
+    #df.to_pickle(outfile)
+    df.to_csv(outfile)
+
+def avg_to_panda(aggregate_output_dir, pandas_output_dir, include_mesh=False):
+
+    mkdirp(pandas_output_dir)
+    print('converting average latency  to pandas...')
+    #outfile = os.path.join(pandas_output_dir, 'cdf.gz')
+    cdf_file = os.path.join(aggregate_output_dir, 'tracestat-avg.txt')
+    df = cdf_to_pandas_single(cdf_file)
+    #print(df)
+    outfile = os.path.join(pandas_output_dir, 'avg.csv')
+    print('writing cdf pandas data to {}'.format(outfile))
+    #df.to_pickle(outfile)
+    df.to_csv(outfile)
+
+def dups_to_panda(aggregate_output_dir, pandas_output_dir, include_mesh=False):
+
+    mkdirp(pandas_output_dir)
+    print('converting latency cdf to pandas...')
+    #outfile = os.path.join(pandas_output_dir, 'cdf.gz')
+    cdf_file = os.path.join(aggregate_output_dir, 'tracestat-dups.txt')
+    df = cdf_to_pandas(cdf_file)
+    #print(df)
+    outfile = os.path.join(pandas_output_dir, 'dups.csv')
+    print('writing cdf pandas data to {}'.format(outfile))
+    #df.to_pickle(outfile)
+    df.to_csv(outfile)
 
 def to_pandas(aggregate_output_dir, pandas_output_dir, include_mesh=False):
     mkdirp(pandas_output_dir)

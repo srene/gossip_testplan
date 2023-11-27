@@ -1,9 +1,9 @@
-module gossip_test
+module gossipsub_testplan
 
 go 1.20
 
 require (
-	github.com/avast/retry-go v2.6.0+incompatible
+	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/libp2p/go-libp2p v0.32.1
 	github.com/libp2p/go-libp2p-pubsub v0.10.0
 	github.com/multiformats/go-multiaddr v0.12.0
@@ -104,4 +104,6 @@ require (
 	nhooyr.io/websocket v1.8.6 // indirect
 )
 
-//replace github.com/libp2p/go-libp2p-pubsub => ../go-libp2p-pubsub/
+replace github.com/libp2p/go-libp2p-pubsub v0.10.0 => github.com/srene/go-libp2p-pubsub v0.0.0-20231126174829-0d02edab8e29
+
+replace sourcegraph.com/sourcegraph/go-diff v0.5.0 => github.com/sourcegraph/go-diff v0.5.1

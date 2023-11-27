@@ -12,6 +12,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	libp2pquic "github.com/libp2p/go-libp2p/p2p/transport/quic"
+	"github.com/libp2p/go-libp2p/p2p/transport/quicreuse"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"golang.org/x/sync/errgroup"
@@ -24,14 +26,18 @@ import (
 )
 
 // Create a new libp2p host
-func createHost(ctx context.Context) (host.Host, error) {
+func createHost(ctx context.Context, quic bool) (host.Host, error) {
 	priv, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	if err != nil {
 		return nil, err
 	}
 
 	// Don't listen yet, we need to set up networking first
-	return libp2p.New(libp2p.Identity(priv), libp2p.NoListenAddrs)
+	if !quic {
+		return libp2p.New(libp2p.Identity(priv), libp2p.NoListenAddrs)
+	} else {
+		return libp2p.New(libp2p.Identity(priv), libp2p.NoListenAddrs, libp2p.QUICReuse(quicreuse.NewConnManager), libp2p.Transport(libp2pquic.NewTransport))
+	}
 }
 
 // setupNetwork instructs the sidecar (if enabled) to setup the network for this
@@ -49,17 +55,17 @@ func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *networ
 	}
 	runenv.RecordMessage("Network init complete")
 
-	lat := time.Duration(rand.Intn(latencyMax-latencyMin) + latencyMin)
+	lat := rand.Intn(latencyMax-latencyMin) + latencyMin
 
 	bw := uint64(bandwidth) * 1000 * 1000
 
-	runenv.RecordMessage("Network params %d %d", lat.Seconds(), bw)
+	runenv.RecordMessage("Network params %d %d", lat, bw)
 
 	config := &network.Config{
 		Network: "default",
 		Enable:  true,
 		Default: network.LinkShape{
-			Latency:   lat * time.Millisecond,
+			Latency:   time.Duration(lat) * time.Millisecond,
 			Bandwidth: bw, //Equivalent to 100Mps
 		},
 		CallbackState: "network-configured",
@@ -78,7 +84,7 @@ func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *networ
 }
 
 // Listen on the address in the testground data network
-func listenAddrs(netclient *network.Client) []multiaddr.Multiaddr {
+func listenAddrs(netclient *network.Client, quic bool) []multiaddr.Multiaddr {
 	ip, err := netclient.GetDataNetworkIP()
 	if err == network.ErrNoTrafficShaping {
 		ip = net.ParseIP("0.0.0.0")
@@ -92,8 +98,13 @@ func listenAddrs(netclient *network.Client) []multiaddr.Multiaddr {
 	}
 
 	// add /tcp/0 to auto select TCP listen port
-	listenAddr := dataAddr.Encapsulate(multiaddr.StringCast("/tcp/0"))
-	return []multiaddr.Multiaddr{listenAddr}
+	if quic {
+		listenAddr := dataAddr.Encapsulate(multiaddr.StringCast("/udp/9000/quic-v1"))
+		return []multiaddr.Multiaddr{listenAddr}
+	} else {
+		listenAddr := dataAddr.Encapsulate(multiaddr.StringCast("/tcp/0"))
+		return []multiaddr.Multiaddr{listenAddr}
+	}
 }
 
 // Called when nodes are ready to start the run, and are waiting for all other nodes to be ready
@@ -149,7 +160,7 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 	// Create the hosts, but don't listen yet (we need to set up the data
 	// network before listening)
 
-	h, err := createHost(ctx)
+	h, err := createHost(ctx, params.netParams.quic)
 	if err != nil {
 		return err
 	}
@@ -186,9 +197,10 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 	}
 
 	// Listen for incoming connections
-	laddr := listenAddrs(netclient)
+	laddr := listenAddrs(netclient, params.netParams.quic)
 	runenv.RecordMessage("listening on %s", laddr)
 	if err = h.Network().Listen(laddr...); err != nil {
+		runenv.RecordMessage("Error listening")
 		return nil
 	}
 

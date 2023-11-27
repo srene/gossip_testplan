@@ -219,7 +219,7 @@ func (p *PubsubNode) Run(runtime time.Duration) error {
 
 	// ensure we have at least enough peers to fill a mesh after warmup period
 	npeers := len(p.h.Network().Peers())
-	if npeers < pubsub.GossipSubD {
+	if npeers < pubsub.GossipSubDlo {
 		//panic(fmt.Errorf("not enough peers after warmup period. Need at least D=%d, have %d", pubsub.GossipSubDlo, npeers))
 		p.runenv.RecordMessage("not enough peers after warmup period. Need at least D=%d, have %d", pubsub.GossipSubD, npeers)
 		selected := p.discovery.topology.SelectNPeers(pubsub.GossipSubD-npeers, p.h.ID(), p.discovery.allPeers)
@@ -380,7 +380,7 @@ func (p *PubsubNode) consumeTopic(ts *topicState) {
 			return
 		}
 		//p.log("Data received %s", msg.Data)
-		p.log("got message %d for topic %s, sent by %s\n", message.Seq, ts.cfg.Id, msg.ReceivedFrom)
+		p.log("got message %d  hops for topic %s, sent by %s\n", message.Seq, ts.cfg.Id, msg.ReceivedFrom)
 		select {
 		case <-ts.done:
 			return
