@@ -42,16 +42,16 @@ func createHost(ctx context.Context, quic bool) (host.Host, error) {
 
 // setupNetwork instructs the sidecar (if enabled) to setup the network for this
 // test case.
-func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *network.Client, latencyMin int, latencyMax int, bandwidth int) error {
+func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *network.Client, latencyMin int, latencyMax int, bandwidth int) (*network.Config, error) {
 	if !runenv.TestSidecar {
-		return nil
+		return nil, nil
 	}
 
 	// Wait for the network to be initialized.
 	runenv.RecordMessage("Waiting for network initialization")
 	err := netclient.WaitNetworkInitialized(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	runenv.RecordMessage("Network init complete")
 
@@ -77,10 +77,10 @@ func setupNetwork(ctx context.Context, runenv *runtime.RunEnv, netclient *networ
 	<-time.After(delay)
 	err = netclient.ConfigureNetwork(ctx, config)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return config, nil
 }
 
 // Listen on the address in the testground data network
@@ -177,7 +177,8 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 
 	runenv.RecordMessage("before netclient.MustConfigureNetwork")
 
-	if err := setupNetwork(ctx, runenv, netclient, params.netParams.latency, params.netParams.latencyMax, params.netParams.bandwidthMB); err != nil {
+	config, err := setupNetwork(ctx, runenv, netclient, params.netParams.latency, params.netParams.latencyMax, params.netParams.bandwidthMB)
+	if err != nil {
 		return fmt.Errorf("Failed to set up network: %w", err)
 	}
 
@@ -258,7 +259,7 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 		OpportunisticGraftTicks: params.opportunisticGraftTicks,
 	}
 
-	p, err := createPubSubNode(ctx, runenv, seq, h, discovery, cfg)
+	p, err := createPubSubNode(ctx, runenv, seq, h, discovery, netclient, config, cfg)
 	if err != nil {
 		runenv.RecordMessage("Failing create pubsub npde")
 		return fmt.Errorf("error waiting for discovery service: %s", err)

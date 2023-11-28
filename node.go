@@ -10,6 +10,7 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/testground/sdk-go/network"
 	"github.com/testground/sdk-go/ptypes"
 	"github.com/testground/sdk-go/runtime"
 	tgsync "github.com/testground/sdk-go/sync"
@@ -97,9 +98,11 @@ type PubsubNode struct {
 	lk        sync.RWMutex
 	topics    map[string]*topicState
 	pubwg     sync.WaitGroup
+	netclient *network.Client
+	netconfig *network.Config
 }
 
-func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h host.Host, discovery *SyncDiscovery, cfg NodeConfig) (*PubsubNode, error) {
+func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h host.Host, discovery *SyncDiscovery, netclient *network.Client, netconfig *network.Config, cfg NodeConfig) (*PubsubNode, error) {
 	opts, err := pubsubOptions(cfg)
 	if err != nil {
 		return nil, err
@@ -108,6 +111,8 @@ func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h 
 	// Set the heartbeat initial delay and interval
 	pubsub.GossipSubHeartbeatInitialDelay = cfg.Heartbeat.InitialDelay
 	pubsub.GossipSubHeartbeatInterval = cfg.Heartbeat.Interval
+	pubsub.GossipSubHistoryLength = 100
+	pubsub.GossipSubHistoryGossip = 50
 
 	ps, err := pubsub.NewGossipSub(ctx, h, opts...)
 
@@ -127,6 +132,8 @@ func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h 
 		ps:        ps,
 		discovery: discovery,
 		topics:    make(map[string]*topicState),
+		netclient: netclient,
+		netconfig: netconfig,
 	}
 
 	p.connectTopology(ctx, cfg.Warmup)
@@ -234,6 +241,48 @@ func (p *PubsubNode) Run(runtime time.Duration) error {
 	case <-time.After(p.cfg.Warmup):
 	case <-p.ctx.Done():
 		return p.ctx.Err()
+	}
+	if p.cfg.Failure {
+		go func() {
+			select {
+			case <-time.After(p.cfg.Warmup * 2):
+			case <-p.ctx.Done():
+				return
+			}
+			p.runenv.RecordMessage("Node stopped !!!!!!!!!!!!!!!")
+			//p.h.Close()
+			//p.netconfig.Default.Latency = 10000000 * time.Millisecond
+			//p.h.ConnManager().Close
+
+			for _, peer := range p.h.Network().Peers() {
+				p.h.Network().ClosePeer(peer)
+			}
+
+			select {
+			case <-time.After(p.cfg.FailureDuration):
+			case <-p.ctx.Done():
+				return
+			}
+			p.runenv.RecordMessage("Node up again !!!!!!!!!!!!!!!")
+
+			/*h, err := createHost(p.ctx, parseParams(p.runenv).netParams.quic)
+			if err != nil {
+				return
+			} else {
+				p.h = h
+			}
+			// Listen for incoming connections
+			laddr := listenAddrs(p.netclient, parseParams(p.runenv).netParams.quic)
+			p.runenv.RecordMessage("listening on %s", laddr)
+			if err := p.h.Network().Listen(laddr...); err != nil {
+				p.runenv.RecordMessage("Error listening")
+				return
+			}*/
+			err2 := p.discovery.ConnectTopology(p.ctx, 0)
+			if err2 != nil {
+				p.runenv.RecordMessage("Error connecting to topology peer: %s", err2)
+			}
+		}()
 	}
 	// join initial topics
 	p.runenv.RecordMessage("Joining initial topics %d.", len(p.cfg.Topics))
