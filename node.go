@@ -117,6 +117,7 @@ func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h 
 	ps, err := pubsub.NewGossipSub(ctx, h, opts...)
 
 	if err != nil {
+		fmt.Errorf("error making new gossipsub: %s", err)
 		return nil, err
 	}
 
@@ -327,14 +328,6 @@ func (p *PubsubNode) joinTopic(t TopicConfig, runtime time.Duration) {
 	}
 
 	go func() {
-		/*p.runenv.RecordMessage("Wait for %s warmup time before starting publisher", "10s")
-		select {
-		case <-time.After(time.Second * 50):
-		case <-p.ctx.Done():
-			p.runenv.RecordMessage("Context done before warm up time in publisher: %s", p.ctx.Err())
-			return
-		}*/
-
 		p.runenv.RecordMessage("Starting publisher with %s publish interval", publishInterval)
 		ts.pubTicker = time.NewTicker(publishInterval)
 		p.publishLoop(&ts)
