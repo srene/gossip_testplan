@@ -117,7 +117,6 @@ func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h 
 	ps, err := pubsub.NewGossipSub(ctx, h, opts...)
 
 	if err != nil {
-		fmt.Errorf("error making new gossipsub: %s", err)
 		return nil, err
 	}
 
@@ -137,36 +136,6 @@ func createPubSubNode(ctx context.Context, runenv *runtime.RunEnv, seq int64, h 
 	}
 
 	p.connectTopology(ctx, cfg.Warmup)
-	/*err = p.Run(t.params.runtime, func(ctx context.Context) error {
-		// wait for all other nodes to be ready
-		if err := t.waitForReadyState(ctx); err != nil {
-			return err
-		}
-
-		// connect topology async
-		go t.connectTopology(ctx)
-
-		return nil
-	})
-	//if seq == 1 {
-	connectionCount := 0
-	for i, peer := range discovery.allPeers {
-		runenv.RecordMessage("Connecting to %d %s ", i, peer.Info.Addrs)
-		err := discovery.connectWithRetry(ctx, peer.Info)
-		//		err := h.Connect(ctx, peer.Info)
-		if err != nil {
-			fmt.Printf("error connecting to peer %s: %s\n", peer.Info.ID, err)
-		} else {
-			connectionCount++
-			runenv.RecordMessage("Connection succesful to %s %d", peer.Info.Addrs, connectionCount)
-			if connectionCount > 15 {
-				break
-			}
-		}
-
-	}*/
-
-	//}
 
 	return p, nil
 }
@@ -250,10 +219,6 @@ func (p *PubsubNode) Run(runtime time.Duration) error {
 				return
 			}
 			p.runenv.RecordMessage("Node stopped !!!!!!!!!!!!!!!")
-			//p.h.Close()
-			//p.netconfig.Default.Latency = 10000000 * time.Millisecond
-			//p.h.ConnManager().Close
-
 			for _, peer := range p.h.Network().Peers() {
 				p.h.Network().ClosePeer(peer)
 			}
@@ -265,19 +230,6 @@ func (p *PubsubNode) Run(runtime time.Duration) error {
 			}
 			p.runenv.RecordMessage("Node up again !!!!!!!!!!!!!!!")
 
-			/*h, err := createHost(p.ctx, parseParams(p.runenv).netParams.quic)
-			if err != nil {
-				return
-			} else {
-				p.h = h
-			}
-			// Listen for incoming connections
-			laddr := listenAddrs(p.netclient, parseParams(p.runenv).netParams.quic)
-			p.runenv.RecordMessage("listening on %s", laddr)
-			if err := p.h.Network().Listen(laddr...); err != nil {
-				p.runenv.RecordMessage("Error listening")
-				return
-			}*/
 			err2 := p.discovery.ConnectTopology(p.ctx, 0)
 			if err2 != nil {
 				p.runenv.RecordMessage("Error connecting to topology peer: %s", err2)

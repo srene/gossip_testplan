@@ -241,13 +241,12 @@ func test(runenv *runtime.RunEnv, initCtx *run.InitContext) error {
 	}
 
 	cfg := NodeConfig{
-		Publisher:       pub,
-		FloodPublishing: false,
-		PeerScoreParams: params.scoreParams,
-		OverlayParams:   params.overlayParams,
-		FailureDuration: params.node_failure_time,
-		Failure:         nodeFailing,
-		//PeerScoreInspect:        scoreInspectParams,
+		Publisher:               pub,
+		FloodPublishing:         false,
+		PeerScoreParams:         params.scoreParams,
+		OverlayParams:           params.overlayParams,
+		FailureDuration:         params.node_failure_time,
+		Failure:                 nodeFailing,
 		Topics:                  topics,
 		Tracer:                  tracer,
 		Seq:                     seq,
